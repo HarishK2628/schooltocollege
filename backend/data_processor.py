@@ -190,6 +190,105 @@ class SchoolDataProcessor:
             'grades_offered': school_row.get('grades_offered', '')
         }
     
+    def format_complete_school_profile(self, school_row: Dict) -> Dict:
+        """Format complete school profile with all requested fields"""
+        def safe_get(value):
+            if pd.isna(value):
+                return None
+            return value
+            
+        def safe_get_string(value):
+            if pd.isna(value) or value == '' or value == 'nan':
+                return None
+            return str(value)
+            
+        def safe_get_numeric(value, multiplier=1):
+            if pd.isna(value) or value == 0:
+                return None
+            return value * multiplier
+            
+        def safe_get_bool(value):
+            if pd.isna(value):
+                return None
+            return bool(value) if value in [0, 1, 0.0, 1.0] else None
+        
+        # Extract top colleges
+        top_colleges = []
+        for i in range(1, 11):  # top_college_01 to top_college_10
+            college_name = safe_get_string(school_row.get(f'top_college_{i:02d}'))
+            if college_name:
+                top_colleges.append({
+                    'uuid': safe_get_string(school_row.get(f'top_college_uuid_{i:02d}')),
+                    'ipeds': safe_get_string(school_row.get(f'top_college_ipeds_{i:02d}')),
+                    'name': college_name
+                })
+        
+        # Extract top majors
+        top_majors = []
+        for i in range(1, 11):  # top_major_01 to top_major_10
+            major_name = safe_get_string(school_row.get(f'top_major_{i:02d}'))
+            if major_name:
+                top_majors.append({
+                    'uuid': safe_get_string(school_row.get(f'top_major_uuid_{i:02d}')),
+                    'cip_code': safe_get_string(school_row.get(f'top_major_cip_code_{i:02d}')),
+                    'name': major_name
+                })
+        
+        return {
+            # Basic Information
+            'niche_school_uuid': safe_get_string(school_row.get('niche_school_uuid')),
+            'school_name': safe_get_string(school_row.get('school_name')),
+            'nces_id': safe_get_string(school_row.get('nces_id')),
+            'niche_sd_uuid': safe_get_string(school_row.get('niche_sd_uuid')),
+            'lea_id': safe_get(school_row.get('lea_id')),
+            'sd_name': safe_get_string(school_row.get('sd_name')),
+            
+            # Location
+            'county_name': safe_get_string(school_row.get('county_name')),
+            'metro_area_name': safe_get_string(school_row.get('metro_area_name')),
+            'state_name': safe_get_string(school_row.get('state_name')),
+            'address_address': safe_get_string(school_row.get('address_address')),
+            'address_city': safe_get_string(school_row.get('address_city')),
+            'address_state': safe_get_string(school_row.get('address_state')),
+            'address_zipcode': safe_get_string(school_row.get('address_zipcode')),
+            'latitude': safe_get(school_row.get('latitude')),
+            'longitude': safe_get(school_row.get('longitude')),
+            
+            # Contact Information
+            'phone_number': safe_get_string(school_row.get('phone_number')),
+            'website': safe_get_string(school_row.get('website')),
+            
+            # Academic Performance
+            'four_year_matriculation_rate': safe_get_numeric(school_row.get('four_year_matriculation_rate'), 100),
+            'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 100),
+            'grade_overall': safe_get_string(school_row.get('grade_overall')),
+            'student_teacher_ratio': safe_get(school_row.get('student_teacher_ratio')),
+            
+            # Demographics
+            'gender_breakdown_female': safe_get(school_row.get('gender_breakdown_female')),
+            'gender_breakdown_male': safe_get(school_row.get('gender_breakdown_male')),
+            'total_students': safe_get(school_row.get('total_students')),
+            
+            # School Characteristics
+            'grades_offered': safe_get_string(school_row.get('grades_offered')),
+            'is_boarding': safe_get_bool(school_row.get('is_boarding')),
+            'is_charter': safe_get_bool(school_row.get('is_charter')),
+            'is_pk': safe_get_bool(school_row.get('is_pk')),
+            'is_elementary': safe_get_bool(school_row.get('is_elementary')),
+            'is_middle': safe_get_bool(school_row.get('is_middle')),
+            'is_high': safe_get_bool(school_row.get('is_high')),
+            'is_public': safe_get_bool(school_row.get('is_public')),
+            'religion_general': safe_get_string(school_row.get('religion_general')),
+            
+            # Financial Information
+            'tuition': safe_get(school_row.get('tuition')),
+            'pk_tuit': safe_get(school_row.get('pk_tuit')),
+            
+            # College and Career Readiness
+            'top_colleges': top_colleges,
+            'top_majors': top_majors
+        }
+    
     def _calculate_college_prep_score(self, school_row: Dict) -> Optional[float]:
         """Calculate college preparation score from available metrics"""
         scores = []
