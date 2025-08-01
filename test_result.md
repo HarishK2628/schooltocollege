@@ -273,7 +273,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All backend tasks completed and tested"
+    - "Search Functionality"
+    - "School Results Display"
+    - "School Profile Modal"
+    - "API Integration"
+    - "Metrics Cards Display"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -281,3 +285,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "Comprehensive backend testing completed. All 7 backend tasks are working correctly. Fixed critical NaN value serialization issue in school detail endpoint. Dataset contains 5000 schools but is heavily skewed toward Massachusetts. All endpoints, data quality, edge cases, and performance requirements are met. Backend is ready for production use."
+  - agent: "testing"
+    message: "Starting comprehensive frontend testing for School Finder application with new school profile functionality. Will test: search flow, results display, profile modal with tabs, API integration, and metrics display. Testing with 'New York' query as specified in requirements."
