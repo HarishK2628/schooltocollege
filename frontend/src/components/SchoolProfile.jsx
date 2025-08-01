@@ -427,24 +427,37 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                         <BookOpen className="w-5 h-5 mr-2" />
                         Top Majors Chosen by Graduates
                       </CardTitle>
+                      <p className="text-sm text-gray-600 mt-2">
+                        This section displays the most popular academic majors and fields of study selected by graduates when they enter college. 
+                        The data represents career paths and academic interests of students from this school, helping you understand the school's academic strengths and student outcomes.
+                      </p>
                     </CardHeader>
                     <CardContent>
                       {profile.top_majors && profile.top_majors.length > 0 ? (
                         <div className="grid gap-3">
                           {profile.top_majors.slice(0, 10).map((major, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div>
-                                <span className="font-medium text-gray-900">{major.name}</span>
+                            <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900 text-lg">{major.name}</div>
                                 {major.cip_code && (
-                                  <span className="text-sm text-gray-500 ml-2">CIP: {major.cip_code}</span>
+                                  <div className="text-sm text-gray-500 mt-1">CIP Code: {major.cip_code}</div>
                                 )}
                               </div>
-                              <Badge variant="outline">#{index + 1}</Badge>
+                              <div className="flex items-center space-x-3">
+                                <div className="text-right">
+                                  <div className="text-sm text-gray-500">Rank</div>
+                                  <Badge variant="secondary" className="text-lg font-bold">#{index + 1}</Badge>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-600 text-center py-8">No major data available</p>
+                        <div className="text-center py-12">
+                          <BookOpen className="mx-auto w-12 h-12 text-gray-400 mb-4" />
+                          <h3 className="text-lg font-medium text-gray-600 mb-2">No Major Data Available</h3>
+                          <p className="text-gray-500">Academic major information for graduates is not currently available for this school.</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
