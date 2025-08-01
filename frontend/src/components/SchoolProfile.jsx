@@ -363,8 +363,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                         Top Majors Chosen by Graduates
                       </CardTitle>
                       <p className="text-sm text-gray-600 mt-2">
-                        This section displays the most popular academic majors and fields of study selected by graduates when they enter college. 
-                        The data represents career paths and academic interests of students from this school, helping you understand the school's academic strengths and student outcomes.
+                        The Majors which the students of this school are most interested in pursuing.
                       </p>
                     </CardHeader>
                     <CardContent>
