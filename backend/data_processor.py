@@ -164,7 +164,7 @@ class SchoolDataProcessor:
                 'college_enrollment': school_row.get('four_year_matriculation_rate', 0) * 100 if school_row.get('four_year_matriculation_rate') else None,
                 'college_performance': school_row.get('graduation_rate', 0) * 100 if school_row.get('graduation_rate') else None,
                 'graduation_rate': school_row.get('graduation_rate', 0) * 100 if school_row.get('graduation_rate') else None,
-                'total_students': int(school_row.get('total_students', 0)) if school_row.get('total_students') else None,
+                'total_students': int(school_row.get('total_students', 0)) if pd.notna(school_row.get('total_students')) and school_row.get('total_students') != 0 else None,
                 'sat_average': school_row.get('sat_average'),
                 'act_average': school_row.get('act_average'),
                 'math_proficiency': school_row.get('math_proficiency', 0) * 100 if school_row.get('math_proficiency') else None,
