@@ -72,11 +72,11 @@ async def get_school_details(
             raise HTTPException(status_code=404, detail="School not found")
         
         school_data = school_row.iloc[0].to_dict()
-        formatted_school = processor.format_school_data(school_data)
+        complete_profile = processor.format_complete_school_profile(school_data)
         
         return {
             "success": True,
-            "data": formatted_school
+            "data": complete_profile
         }
         
     except HTTPException:
