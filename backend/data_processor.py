@@ -145,6 +145,18 @@ class SchoolDataProcessor:
     
     def format_school_data(self, school_row: Dict) -> Dict:
         """Format raw school data into API response format"""
+        def safe_get(value):
+            """Safely get a value, converting NaN to None"""
+            if pd.isna(value):
+                return None
+            return value
+            
+        def safe_get_numeric(value, multiplier=1):
+            """Safely get a numeric value, converting NaN to None"""
+            if pd.isna(value) or value == 0:
+                return None
+            return value * multiplier
+            
         return {
             'id': school_row.get('niche_school_uuid', ''),
             'school_name': school_row.get('school_name', ''),
@@ -152,26 +164,26 @@ class SchoolDataProcessor:
                 'street': school_row.get('address_address', ''),
                 'city': school_row.get('address_city', ''),
                 'state': school_row.get('address_state', ''),
-                'zipcode': str(school_row.get('address_zipcode', '')) if school_row.get('address_zipcode') else None
+                'zipcode': str(school_row.get('address_zipcode', '')) if school_row.get('address_zipcode') and not pd.isna(school_row.get('address_zipcode')) else None
             },
             'coordinates': {
-                'latitude': school_row.get('latitude'),
-                'longitude': school_row.get('longitude')
-            } if school_row.get('latitude') and school_row.get('longitude') else None,
+                'latitude': safe_get(school_row.get('latitude')),
+                'longitude': safe_get(school_row.get('longitude'))
+            } if safe_get(school_row.get('latitude')) and safe_get(school_row.get('longitude')) else None,
             'metrics': {
-                'college_readiness_score': school_row.get('act_average'),
+                'college_readiness_score': safe_get(school_row.get('act_average')),
                 'college_preparation': self._calculate_college_prep_score(school_row),
-                'college_enrollment': school_row.get('four_year_matriculation_rate', 0) * 100 if school_row.get('four_year_matriculation_rate') else None,
-                'college_performance': school_row.get('graduation_rate', 0) * 100 if school_row.get('graduation_rate') else None,
-                'graduation_rate': school_row.get('graduation_rate', 0) * 100 if school_row.get('graduation_rate') else None,
+                'college_enrollment': safe_get_numeric(school_row.get('four_year_matriculation_rate'), 100),
+                'college_performance': safe_get_numeric(school_row.get('graduation_rate'), 100),
+                'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 100),
                 'total_students': int(school_row.get('total_students', 0)) if pd.notna(school_row.get('total_students')) and school_row.get('total_students') != 0 else None,
-                'sat_average': school_row.get('sat_average'),
-                'act_average': school_row.get('act_average'),
-                'math_proficiency': school_row.get('math_proficiency', 0) * 100 if school_row.get('math_proficiency') else None,
-                'reading_proficiency': school_row.get('reading_proficiency', 0) * 100 if school_row.get('reading_proficiency') else None
+                'sat_average': safe_get(school_row.get('sat_average')),
+                'act_average': safe_get(school_row.get('act_average')),
+                'math_proficiency': safe_get_numeric(school_row.get('math_proficiency'), 100),
+                'reading_proficiency': safe_get_numeric(school_row.get('reading_proficiency'), 100)
             },
             'demographics': {
-                'free_reduced_lunch': school_row.get('free_reduced_lunch'),
+                'free_reduced_lunch': safe_get(school_row.get('free_reduced_lunch')),
                 'diversity_breakdown': self._extract_diversity_data(school_row)
             },
             'school_type': self._determine_school_type(school_row),
