@@ -137,10 +137,10 @@ class SchoolDataProcessor:
         academic_performance = (grad_rate.mean() if not grad_rate.empty else 0.75) * 100
         
         return {
-            'college_readiness_score': round(college_readiness, 0),
-            'academic_preparation': round(academic_prep, 0),
-            'college_enrollment': round(college_enrollment, 0),
-            'academic_performance': round(academic_performance, 0)
+            'college_readiness_score': max(0, round(college_readiness, 0)),
+            'academic_preparation': max(0, round(academic_prep, 0)),
+            'college_enrollment': max(0, round(college_enrollment, 0)),
+            'academic_performance': max(0, round(academic_performance, 0))
         }
     
     def format_school_data(self, school_row: Dict) -> Dict:
