@@ -194,14 +194,19 @@ class SchoolDataProcessor:
         """Calculate college preparation score from available metrics"""
         scores = []
         
-        if school_row.get('math_proficiency'):
-            scores.append(school_row['math_proficiency'] * 100)
-        if school_row.get('reading_proficiency'):
-            scores.append(school_row['reading_proficiency'] * 100)
-        if school_row.get('grade_academics'):
+        math_prof = school_row.get('math_proficiency')
+        if math_prof and not pd.isna(math_prof):
+            scores.append(math_prof * 100)
+            
+        reading_prof = school_row.get('reading_proficiency')
+        if reading_prof and not pd.isna(reading_prof):
+            scores.append(reading_prof * 100)
+            
+        grade_academics = school_row.get('grade_academics')
+        if grade_academics and not pd.isna(grade_academics):
             # Convert letter grade to numeric
             grade_map = {'A+': 100, 'A': 95, 'A-': 90, 'B+': 85, 'B': 80, 'B-': 75, 'C+': 70, 'C': 65}
-            scores.append(grade_map.get(school_row['grade_academics'], 70))
+            scores.append(grade_map.get(grade_academics, 70))
             
         return sum(scores) / len(scores) if scores else None
     
