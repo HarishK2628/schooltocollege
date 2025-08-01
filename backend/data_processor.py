@@ -218,9 +218,10 @@ class SchoolDataProcessor:
         ]
         
         for field in diversity_fields:
-            if school_row.get(field):
+            value = school_row.get(field)
+            if value and not pd.isna(value):
                 key = field.replace('diversity_breakdown_', '')
-                diversity[key] = school_row[field]
+                diversity[key] = value
                 
         return diversity
     
