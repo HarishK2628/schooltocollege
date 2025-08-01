@@ -311,71 +311,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="demographics" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <Users className="w-5 h-5 mr-2" />
-                        Student Body
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {formatNumber(profile.total_students)}
-                          </div>
-                          <div className="text-sm text-gray-600">Total Students</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-pink-600">
-                            {formatPercentage(profile.gender_breakdown_female)}
-                          </div>
-                          <div className="text-sm text-gray-600">Female</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {formatPercentage(profile.gender_breakdown_male)}
-                          </div>
-                          <div className="text-sm text-gray-600">Male</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-600">
-                            {profile.religion_general || 'Secular'}
-                          </div>
-                          <div className="text-sm text-gray-600">Religious Affiliation</div>
-                        </div>
-                      </div>
-                      
-                      {(profile.tuition || profile.pk_tuit) && (
-                        <Separator className="my-4" />
-                      )}
-                      
-                      {(profile.tuition || profile.pk_tuit) && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 flex items-center mb-2">
-                            <DollarSign className="w-4 h-4 mr-1" />
-                            Tuition Information
-                          </label>
-                          <div className="grid grid-cols-2 gap-4">
-                            {profile.tuition && (
-                              <div>
-                                <p className="text-lg font-semibold">${formatNumber(profile.tuition)}</p>
-                                <p className="text-sm text-gray-600">Annual Tuition</p>
-                              </div>
-                            )}
-                            {profile.pk_tuit && (
-                              <div>
-                                <p className="text-lg font-semibold">${formatNumber(profile.pk_tuit)}</p>
-                                <p className="text-sm text-gray-600">Pre-K Tuition</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+
 
                 <TabsContent value="colleges" className="space-y-4">
                   <Card>
