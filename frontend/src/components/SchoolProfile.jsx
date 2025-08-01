@@ -195,9 +195,8 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
               </Card>
 
               <Tabs defaultValue="academics" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="academics">Academics</TabsTrigger>
-                  <TabsTrigger value="demographics">Demographics</TabsTrigger>
                   <TabsTrigger value="colleges">Top Colleges</TabsTrigger>
                   <TabsTrigger value="majors">Top Majors</TabsTrigger>
                 </TabsList>
