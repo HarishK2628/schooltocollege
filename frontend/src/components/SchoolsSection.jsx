@@ -2,15 +2,28 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
-import { Search, GraduationCap } from 'lucide-react';
+import { Search, GraduationCap, Eye } from 'lucide-react';
+import SchoolProfile from './SchoolProfile';
 
 const SchoolsSection = ({ schools, isSearched }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedSchoolId, setSelectedSchoolId] = useState(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const filteredSchools = schools.filter(school => 
     school.school_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleSchoolClick = (schoolId) => {
+    setSelectedSchoolId(schoolId);
+    setIsProfileOpen(true);
+  };
+
+  const handleCloseProfile = () => {
+    setIsProfileOpen(false);
+    setSelectedSchoolId(null);
+  };
 
   if (!isSearched) {
     return (
@@ -89,26 +102,37 @@ const SchoolsSection = ({ schools, isSearched }) => {
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Preparation</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Enrollment</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Performance</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-600">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredSchools.map((school) => (
-                        <tr key={school.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer">
+                        <tr key={school.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-4 px-4">
                             <div className="font-medium text-gray-900">{school.school_name}</div>
                             <div className="text-sm text-gray-500">{school.address_city}, {school.address_state}</div>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_readiness_score}</span>
+                            <span className="text-blue-600 font-medium">{school.college_readiness_score || '--'}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_preparation}</span>
+                            <span className="text-blue-600 font-medium">{school.college_preparation || '--'}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_enrollment}</span>
+                            <span className="text-blue-600 font-medium">{school.college_enrollment || '--'}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_performance}</span>
+                            <span className="text-blue-600 font-medium">{school.college_performance || '--'}</span>
+                          </td>
+                          <td className="text-center py-4 px-4">
+                            <button
+                              onClick={() => handleSchoolClick(school.id)}
+                              className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
+                              title="View School Profile"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Profile
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -128,6 +152,13 @@ const SchoolsSection = ({ schools, isSearched }) => {
           </CardContent>
         </Card>
       </div>
+      
+      {/* School Profile Modal */}
+      <SchoolProfile
+        schoolId={selectedSchoolId}
+        isOpen={isProfileOpen}
+        onClose={handleCloseProfile}
+      />
     </div>
   );
 };
