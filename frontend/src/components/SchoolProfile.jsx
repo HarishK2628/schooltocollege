@@ -384,24 +384,37 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                         <Award className="w-5 h-5 mr-2" />
                         Top Colleges Attended by Graduates
                       </CardTitle>
+                      <p className="text-sm text-gray-600 mt-2">
+                        This list shows the most popular colleges and universities where graduates from this school continue their higher education. 
+                        The rankings reflect the percentage of students who enrolled at each institution based on historical data.
+                      </p>
                     </CardHeader>
                     <CardContent>
                       {profile.top_colleges && profile.top_colleges.length > 0 ? (
                         <div className="grid gap-3">
                           {profile.top_colleges.slice(0, 10).map((college, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div>
-                                <span className="font-medium text-gray-900">{college.name}</span>
+                            <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900 text-lg">{college.name}</div>
                                 {college.ipeds && (
-                                  <span className="text-sm text-gray-500 ml-2">ID: {college.ipeds}</span>
+                                  <div className="text-sm text-gray-500 mt-1">Institution ID: {college.ipeds}</div>
                                 )}
                               </div>
-                              <Badge variant="outline">#{index + 1}</Badge>
+                              <div className="flex items-center space-x-3">
+                                <div className="text-right">
+                                  <div className="text-sm text-gray-500">Rank</div>
+                                  <Badge variant="secondary" className="text-lg font-bold">#{index + 1}</Badge>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-600 text-center py-8">No college data available</p>
+                        <div className="text-center py-12">
+                          <Award className="mx-auto w-12 h-12 text-gray-400 mb-4" />
+                          <h3 className="text-lg font-medium text-gray-600 mb-2">No College Data Available</h3>
+                          <p className="text-gray-500">College enrollment information for graduates is not currently available for this school.</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
