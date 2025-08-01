@@ -321,8 +321,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                         Top Colleges Attended by Graduates
                       </CardTitle>
                       <p className="text-sm text-gray-600 mt-2">
-                        This list shows the most popular colleges and universities where graduates from this school continue their higher education. 
-                        The rankings reflect the percentage of students who enrolled at each institution based on historical data.
+                        The Colleges where the students of this school are most interested to attend after graduating.
                       </p>
                     </CardHeader>
                     <CardContent>
