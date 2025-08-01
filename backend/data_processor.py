@@ -117,10 +117,10 @@ class SchoolDataProcessor:
         
         college_readiness = 0
         if not act_avg.empty:
-            college_readiness = act_avg.mean()
+            college_readiness = max(0, act_avg.mean())
         elif not sat_avg.empty:
             # Convert SAT to ACT scale approximately
-            college_readiness = (sat_avg.mean() - 400) / 52  # Rough conversion
+            college_readiness = max(0, (sat_avg.mean() - 400) / 52)  # Rough conversion
             
         # Academic Preparation (math + reading proficiency)
         math_prof = df['math_proficiency'].dropna()
