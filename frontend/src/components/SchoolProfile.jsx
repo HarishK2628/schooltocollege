@@ -455,6 +455,9 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
       </div>
     </div>
   );
+
+  // Render modal using a portal to ensure it's at the top level
+  return createPortal(modalContent, document.body);
 };
 
 export default SchoolProfile;
