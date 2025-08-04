@@ -423,9 +423,8 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
             </div>
           ) : null}
         </ScrollArea>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 
