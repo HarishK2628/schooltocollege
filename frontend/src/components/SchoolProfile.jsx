@@ -443,7 +443,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
             </div>
           ) : null}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );
