@@ -96,15 +96,16 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      {/* Full Screen Backdrop - completely blocks everything */}
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black bg-opacity-75"
         onClick={onClose}
       />
       
       {/* Modal Content */}
-      <div className="relative z-50 w-full max-w-4xl max-h-[90vh] mx-4 bg-white rounded-lg shadow-2xl overflow-hidden">
+      <div className="relative z-[10000] w-full max-w-4xl max-h-[90vh] mx-4 bg-white rounded-lg shadow-2xl overflow-hidden">
+        {/* Header */}
         <div className="flex flex-row items-center justify-between p-6 border-b bg-white">
           <h2 className="text-2xl font-bold text-gray-900">
             {profile?.school_name || 'School Profile'}
@@ -117,7 +118,8 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
           </button>
         </div>
         
-        <ScrollArea className="h-[calc(90vh-120px)] bg-white">
+        {/* Content */}
+        <div className="h-[calc(90vh-120px)] bg-white overflow-y-auto">
           <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
