@@ -312,20 +312,22 @@ class SchoolDataProcessor:
     def _extract_diversity_data(self, school_row: Dict) -> Dict[str, float]:
         """Extract diversity breakdown from school data"""
         diversity = {}
-        diversity_fields = [
-            'diversity_breakdown_african_american',
-            'diversity_breakdown_asian', 
-            'diversity_breakdown_hispanic',
-            'diversity_breakdown_white',
-            'diversity_breakdown_multiracial',
-            'diversity_breakdown_native_american'
-        ]
+        diversity_fields = {
+            'diversity_breakdown_african_american': 'African American',
+            'diversity_breakdown_asian': 'Asian', 
+            'diversity_breakdown_hispanic': 'Hispanic/Latino',
+            'diversity_breakdown_white': 'White',
+            'diversity_breakdown_multiracial': 'Multiracial',
+            'diversity_breakdown_native_american': 'Native American',
+            'diversity_breakdown_pacific_islander': 'Pacific Islander',
+            'diversity_breakdown_international': 'International',
+            'diversity_breakdown_unknown': 'Unknown'
+        }
         
-        for field in diversity_fields:
+        for field, label in diversity_fields.items():
             value = school_row.get(field)
             if value and not pd.isna(value):
-                key = field.replace('diversity_breakdown_', '')
-                diversity[key] = value
+                diversity[label] = float(value)
                 
         return diversity
     
