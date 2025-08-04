@@ -95,16 +95,24 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* Full Screen Backdrop - completely blocks everything */}
+  const modalContent = (
+    <div 
+      className="fixed inset-0 z-[99999] flex items-center justify-center"
+      style={{ zIndex: 99999 }}
+    >
+      {/* Full Screen Backdrop */}
       <div 
-        className="absolute inset-0 bg-black bg-opacity-75"
+        className="absolute inset-0 bg-black bg-opacity-80"
         onClick={onClose}
+        style={{ zIndex: 99998 }}
       />
       
       {/* Modal Content */}
-      <div className="relative z-[10000] w-full max-w-4xl max-h-[90vh] mx-4 bg-white rounded-lg shadow-2xl overflow-hidden">
+      <div 
+        className="relative w-full max-w-4xl max-h-[90vh] mx-4 bg-white rounded-lg shadow-2xl overflow-hidden"
+        style={{ zIndex: 99999 }}
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+      >
         {/* Header */}
         <div className="flex flex-row items-center justify-between p-6 border-b bg-white">
           <h2 className="text-2xl font-bold text-gray-900">
