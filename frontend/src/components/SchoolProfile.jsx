@@ -80,20 +80,22 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle className="text-2xl font-bold">
-            {profile?.school_name || 'School Profile'}
-          </DialogTitle>
-          <button 
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </DialogHeader>
-        
-        <ScrollArea className="h-[calc(90vh-100px)]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white border-0 shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+        <div className="relative z-50 bg-white rounded-lg">
+          <DialogHeader className="flex flex-row items-center justify-between p-6 border-b">
+            <DialogTitle className="text-2xl font-bold">
+              {profile?.school_name || 'School Profile'}
+            </DialogTitle>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[calc(90vh-120px)] p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
