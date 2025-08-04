@@ -15,11 +15,11 @@ import {
   DollarSign,
   Award,
   BookOpen,
-  Target,
-  TrendingUp,
+  PieChart,
   X
 } from 'lucide-react';
 import { schoolAPI } from '../services/api';
+import DiversityChart from './DiversityChart';
 
 const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
   const [profile, setProfile] = useState(null);
@@ -195,8 +195,9 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
               </Card>
 
               <Tabs defaultValue="academics" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="academics">Academics</TabsTrigger>
+                  <TabsTrigger value="diversity">Diversity</TabsTrigger>
                   <TabsTrigger value="colleges">Top Colleges</TabsTrigger>
                   <TabsTrigger value="majors">Top Majors</TabsTrigger>
                 </TabsList>
@@ -311,7 +312,22 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                   </Card>
                 </TabsContent>
 
-
+                <TabsContent value="diversity" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <PieChart className="w-5 h-5 mr-2" />
+                        Student Diversity
+                      </CardTitle>
+                      <p className="text-sm text-gray-600 mt-2">
+                        Demographic breakdown of the student body showing racial and ethnic diversity.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <DiversityChart diversityData={profile.diversity_breakdown} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
 
                 <TabsContent value="colleges" className="space-y-4">
                   <Card>
