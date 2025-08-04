@@ -422,6 +422,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
               </Tabs>
             </div>
           ) : null}
+          </div>
         </ScrollArea>
       </div>
     </div>
