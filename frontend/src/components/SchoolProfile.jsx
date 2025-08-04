@@ -79,23 +79,28 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-white border-0 shadow-2xl">
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
-        <div className="relative z-50 bg-white rounded-lg">
-          <DialogHeader className="flex flex-row items-center justify-between p-6 border-b">
-            <DialogTitle className="text-2xl font-bold">
-              {profile?.school_name || 'School Profile'}
-            </DialogTitle>
-            <button 
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </DialogHeader>
-          
-          <ScrollArea className="h-[calc(90vh-120px)] p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal Content */}
+      <div className="relative z-50 w-full max-w-4xl max-h-[90vh] mx-4 bg-white rounded-lg shadow-2xl overflow-hidden">
+        <div className="flex flex-row items-center justify-between p-6 border-b bg-white">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {profile?.school_name || 'School Profile'}
+          </h2>
+          <button 
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <ScrollArea className="h-[calc(90vh-120px)] bg-white">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
