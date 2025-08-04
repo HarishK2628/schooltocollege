@@ -41,12 +41,12 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      document.body.classList.add('modal-open'); // Add class to hide body scroll
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.body.classList.remove('modal-open'); // Remove class when modal closes
     };
   }, [isOpen, onClose]);
 
