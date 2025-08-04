@@ -284,6 +284,9 @@ class SchoolDataProcessor:
             'tuition': safe_get(school_row.get('tuition')),
             'pk_tuit': safe_get(school_row.get('pk_tuit')),
             
+            # Diversity Information
+            'diversity_breakdown': self._extract_diversity_data(school_row),
+            
             # College and Career Readiness
             'top_colleges': top_colleges,
             'top_majors': top_majors
