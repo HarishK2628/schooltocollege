@@ -31,6 +31,24 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
     }
   }, [isOpen, schoolId]);
 
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
   const fetchSchoolProfile = async () => {
     setLoading(true);
     setError(null);
