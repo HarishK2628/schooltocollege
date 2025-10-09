@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 import logging
+import re
 from pathlib import Path
+from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger(__name__)
 
@@ -63,41 +65,120 @@ class SchoolDataProcessor:
         if self.df is None:
             return []
             
-        query_lower = query.lower().strip()
-        
-        # Create search conditions
-        conditions = (
-            self.df['search_city'].str.contains(query_lower, na=False) |
-            self.df['search_county'].str.contains(query_lower, na=False) |
-            self.df['search_metro'].str.contains(query_lower, na=False) |
-            self.df['search_state'].str.contains(query_lower, na=False) |
-            self.df['search_address'].str.contains(query_lower, na=False)
-        )
-        
-        # Filter results
-        results = self.df[conditions].copy()
-        
-        # Sort by relevance (exact matches first, then by college readiness)
-        results['relevance_score'] = 0
-        
-        # Boost exact city matches
-        results.loc[results['search_city'] == query_lower, 'relevance_score'] += 100
-        
-        # Boost exact county matches
-        results.loc[results['search_county'] == query_lower, 'relevance_score'] += 90
-        
-        # Boost exact state matches
-        results.loc[results['search_state'] == query_lower, 'relevance_score'] += 80
-        
-        # Add college readiness score to relevance
-        results['relevance_score'] += results['act_average'].fillna(0) * 0.1
-        results['relevance_score'] += results['sat_average'].fillna(0) * 0.01
-        
+        query_lower = (query or '').strip().lower()
+        if not query_lower:
+            return []
+
+        # Break the query into tokens to improve matching precision
+        normalized_query = re.sub(r'[^a-z0-9\\s]', ' ', query_lower)
+        stopwords = {'area', 'county', 'state', 'city', 'school', 'schools', 'district'}
+        tokens = [
+            token for token in normalized_query.split()
+            if token and token not in stopwords
+        ]
+
+        if not tokens and query_lower:
+            tokens = [query_lower]
+
+        match_tokens = [token for token in tokens if len(token) > 2]
+        if not match_tokens and tokens:
+            match_tokens = tokens.copy()
+
+        # Base condition: any part of the query matches key location fields
+        location_columns = [
+            'search_school_name',
+            'search_city',
+            'search_county',
+            'search_metro',
+            'search_state',
+            'search_address'
+        ]
+        base_condition = pd.Series(False, index=self.df.index, dtype=bool)
+        for column in location_columns:
+            if column in self.df.columns:
+                base_condition |= self.df[column].str.contains(query_lower, na=False)
+
+        candidate_df = self.df[base_condition].copy() if base_condition.any() else self.df.copy()
+
+        # Token condition: ensure every meaningful token appears in precise fields
+        if match_tokens:
+            token_condition = pd.Series(True, index=self.df.index, dtype=bool)
+            for token in match_tokens:
+                token_matches = (
+                    self.df['search_school_name'].str.contains(token, na=False) |
+                    self.df['search_city'].str.contains(token, na=False) |
+                    self.df['search_county'].str.contains(token, na=False) |
+                    self.df['search_state'].str.contains(token, na=False)
+                )
+                token_condition &= token_matches
+            filtered_df = candidate_df[token_condition.loc[candidate_df.index]].copy()
+
+            # If no results after strict filtering, fall back to base condition
+            if filtered_df.empty:
+                filtered_df = candidate_df.copy()
+        else:
+            filtered_df = candidate_df.copy()
+
+        if filtered_df.empty:
+            return []
+
+        # Compute relevance score with higher weight for precise matches
+        filtered_df['relevance_score'] = 0.0
+
+        token_phrase = ' '.join(match_tokens)
+
+        if tokens:
+            for token in tokens:
+                filtered_df.loc[
+                    filtered_df['search_school_name'].str.contains(token, na=False),
+                    'relevance_score'
+                ] += 70
+                filtered_df.loc[
+                    filtered_df['search_city'].str.contains(token, na=False),
+                    'relevance_score'
+                ] += 120
+                filtered_df.loc[
+                    filtered_df['search_county'].str.contains(token, na=False),
+                    'relevance_score'
+                ] += 100
+                filtered_df.loc[
+                    filtered_df['search_state'].str.contains(token, na=False),
+                    'relevance_score'
+                ] += 60
+
+        if token_phrase:
+            filtered_df.loc[
+                filtered_df['search_city'] == token_phrase,
+                'relevance_score'
+            ] += 200
+            filtered_df.loc[
+                filtered_df['search_county'] == token_phrase,
+                'relevance_score'
+            ] += 150
+            filtered_df.loc[
+                filtered_df['search_school_name'] == token_phrase,
+                'relevance_score'
+            ] += 150
+
+        # Metro matches still provide a small boost
+        filtered_df.loc[
+            filtered_df['search_metro'].str.contains(query_lower, na=False),
+            'relevance_score'
+        ] += 30
+        filtered_df.loc[
+            filtered_df['search_metro'] == query_lower,
+            'relevance_score'
+        ] += 50
+
+        # Add test score contribution
+        filtered_df['relevance_score'] += filtered_df['act_average'].fillna(0) * 0.1
+        filtered_df['relevance_score'] += filtered_df['sat_average'].fillna(0) * 0.01
+
         # Sort by relevance score
-        results = results.sort_values('relevance_score', ascending=False)
-        
+        filtered_df = filtered_df.sort_values('relevance_score', ascending=False)
+
         # Convert to list of dictionaries
-        return results.to_dict('records')
+        return filtered_df.to_dict('records')
     
     def calculate_aggregate_metrics(self, schools_data: List[Dict]) -> Dict[str, float]:
         """Calculate aggregate metrics from school list"""
@@ -211,28 +292,60 @@ class SchoolDataProcessor:
             if pd.isna(value):
                 return None
             return bool(value) if value in [0, 1, 0.0, 1.0] else None
+
+        def normalize_identifier(value):
+            """Normalize identifier-like fields to readable strings"""
+            cleaned = safe_get_string(value)
+            if cleaned is None:
+                return None
+            try:
+                decimal_value = Decimal(cleaned)
+                normalized = format(decimal_value.normalize(), 'f')
+                if '.' in normalized:
+                    normalized = normalized.rstrip('0').rstrip('.')
+                return normalized
+            except (InvalidOperation, ValueError):
+                return cleaned.strip()
         
         # Extract top colleges
         top_colleges = []
+        seen_colleges = set()
         for i in range(1, 11):  # top_college_01 to top_college_10
             college_name = safe_get_string(school_row.get(f'top_college_{i:02d}'))
-            if college_name:
-                top_colleges.append({
-                    'uuid': safe_get_string(school_row.get(f'top_college_uuid_{i:02d}')),
-                    'ipeds': safe_get_string(school_row.get(f'top_college_ipeds_{i:02d}')),
-                    'name': college_name
-                })
+            if not college_name:
+                continue
+            college_uuid = normalize_identifier(school_row.get(f'top_college_uuid_{i:02d}'))
+            college_ipeds = normalize_identifier(school_row.get(f'top_college_ipeds_{i:02d}'))
+            dedupe_key = (college_name, college_uuid)
+            if dedupe_key in seen_colleges:
+                continue
+            seen_colleges.add(dedupe_key)
+            top_colleges.append({
+                'rank': i,
+                'uuid': college_uuid,
+                'ipeds': college_ipeds,
+                'name': college_name
+            })
         
         # Extract top majors
         top_majors = []
+        seen_majors = set()
         for i in range(1, 11):  # top_major_01 to top_major_10
             major_name = safe_get_string(school_row.get(f'top_major_{i:02d}'))
-            if major_name:
-                top_majors.append({
-                    'uuid': safe_get_string(school_row.get(f'top_major_uuid_{i:02d}')),
-                    'cip_code': safe_get_string(school_row.get(f'top_major_cip_code_{i:02d}')),
-                    'name': major_name
-                })
+            if not major_name:
+                continue
+            major_uuid = normalize_identifier(school_row.get(f'top_major_uuid_{i:02d}'))
+            major_cip = normalize_identifier(school_row.get(f'top_major_cip_code_{i:02d}'))
+            dedupe_key = (major_name, major_uuid)
+            if dedupe_key in seen_majors:
+                continue
+            top_majors.append({
+                'rank': i,
+                'uuid': major_uuid,
+                'cip_code': major_cip,
+                'name': major_name
+            })
+            seen_majors.add(dedupe_key)
         
         return {
             # Basic Information
@@ -342,3 +455,4 @@ class SchoolDataProcessor:
             return 'Charter'
         else:
             return 'Private'
+
