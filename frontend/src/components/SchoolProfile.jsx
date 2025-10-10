@@ -21,16 +21,17 @@ import {
 import { schoolAPI } from '../services/api';
 import DiversityChart from './DiversityChart';
 
-const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
+const SchoolProfile = ({ schoolId, schoolSummary, isOpen, onClose }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (isOpen && schoolId) {
+      setProfile(null);
       fetchSchoolProfile();
     }
-  }, [isOpen, schoolId]);
+  }, [isOpen, schoolId, schoolSummary]);
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -55,7 +56,18 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
     setError(null);
     
     try {
-      const response = await schoolAPI.getSchoolDetails(schoolId);
+      const params = schoolSummary
+        ? Object.fromEntries(
+            Object.entries({
+              city: schoolSummary.address_city,
+              state: schoolSummary.address_state,
+              name: schoolSummary.school_name,
+              zipcode: schoolSummary.address_zipcode
+            }).filter(([_, value]) => value !== undefined && value !== null && value !== '')
+          )
+        : {};
+
+      const response = await schoolAPI.getSchoolDetails(schoolId, params);
       if (response.success) {
         setProfile(response.data);
       }
@@ -67,13 +79,18 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
   };
 
   const formatPercentage = (value) => {
-    if (!value) return 'N/A';
-    return `${Math.round(value)}%`;
+    if (value === null || value === undefined) return 'N/A';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return 'N/A';
+    return `${Math.round(numeric)}%`;
   };
 
   const formatNumber = (value) => {
-    if (!value) return 'N/A';
-    return value.toLocaleString();
+    if (value === null || value === undefined) return 'N/A';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return 'N/A';
+    const rounded = Math.round(numeric);
+    return rounded.toLocaleString();
   };
 
   const getSchoolTypes = (profile) => {
@@ -257,7 +274,7 @@ const SchoolProfile = ({ schoolId, isOpen, onClose }) => {
                         </div>
                         <div className="text-center">
                           <div className="text-2xl font-bold text-purple-600">
-                            {profile.student_teacher_ratio || 'N/A'}
+                            {formatNumber(profile.student_teacher_ratio)}
                           </div>
                           <div className="text-sm text-gray-600">Student:Teacher Ratio</div>
                         </div>

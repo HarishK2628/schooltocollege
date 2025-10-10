@@ -9,20 +9,30 @@ const SchoolsSection = ({ schools, isSearched }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [selectedSchoolId, setSelectedSchoolId] = useState(null);
+  const [selectedSchool, setSelectedSchool] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const formatScore = (value) => {
+    if (value === null || value === undefined) return '--';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return '--';
+    return Math.round(numeric);
+  };
 
   const filteredSchools = schools.filter(school => 
     school.school_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSchoolClick = (schoolId) => {
-    setSelectedSchoolId(schoolId);
+  const handleSchoolClick = (school) => {
+    setSelectedSchoolId(school.id);
+    setSelectedSchool(school);
     setIsProfileOpen(true);
   };
 
   const handleCloseProfile = () => {
     setIsProfileOpen(false);
     setSelectedSchoolId(null);
+    setSelectedSchool(null);
   };
 
   if (!isSearched) {
@@ -101,7 +111,7 @@ const SchoolsSection = ({ schools, isSearched }) => {
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Readiness Score</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Preparation</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">College Enrollment</th>
-                        <th className="text-center py-3 px-4 font-medium text-gray-600">College Performance</th>
+                        <th className="text-center py-3 px-4 font-medium text-gray-600">Graduation Rate (%)</th>
                         <th className="text-center py-3 px-4 font-medium text-gray-600">Actions</th>
                       </tr>
                     </thead>
@@ -113,20 +123,20 @@ const SchoolsSection = ({ schools, isSearched }) => {
                             <div className="text-sm text-gray-500">{school.address_city}, {school.address_state}</div>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_readiness_score || '--'}</span>
+                            <span className="text-blue-600 font-medium">{formatScore(school.college_readiness_score)}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_preparation || '--'}</span>
+                            <span className="text-blue-600 font-medium">{formatScore(school.college_preparation)}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_enrollment || '--'}</span>
+                            <span className="text-blue-600 font-medium">{formatScore(school.college_enrollment)}</span>
                           </td>
                           <td className="text-center py-4 px-4">
-                            <span className="text-blue-600 font-medium">{school.college_performance || '--'}</span>
+                            <span className="text-blue-600 font-medium">{formatScore(school.graduation_rate_percent)}</span>
                           </td>
                           <td className="text-center py-4 px-4">
                             <button
-                              onClick={() => handleSchoolClick(school.id)}
+                              onClick={() => handleSchoolClick(school)}
                               className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors"
                               title="View School Profile"
                             >
@@ -156,6 +166,7 @@ const SchoolsSection = ({ schools, isSearched }) => {
       {/* School Profile Modal */}
       <SchoolProfile
         schoolId={selectedSchoolId}
+        schoolSummary={selectedSchool}
         isOpen={isProfileOpen}
         onClose={handleCloseProfile}
       />

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 from models import SearchRequest, SearchResponse, School
 from data_processor import SchoolDataProcessor
@@ -58,6 +58,10 @@ async def search_schools(
 @router.get("/{school_id}")
 async def get_school_details(
     school_id: str,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    name: Optional[str] = None,
+    zipcode: Optional[str] = None,
     processor: SchoolDataProcessor = Depends(get_data_processor)
 ):
     """Get detailed information for a specific school"""
@@ -65,13 +69,17 @@ async def get_school_details(
         if processor.df is None:
             raise HTTPException(status_code=500, detail="School data not loaded")
             
-        # Find school by UUID
-        school_row = processor.df[processor.df['niche_school_uuid'] == school_id]
-        
-        if school_row.empty:
+        school_data = processor.get_school_record(
+            school_id,
+            name=name,
+            city=city,
+            state=state,
+            zipcode=zipcode
+        )
+
+        if school_data is None:
             raise HTTPException(status_code=404, detail="School not found")
-        
-        school_data = school_row.iloc[0].to_dict()
+
         complete_profile = processor.format_complete_school_profile(school_data)
         
         return {

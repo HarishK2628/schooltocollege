@@ -18,11 +18,15 @@ const DiversityChart = ({ diversityData }) => {
   // Convert diversity data to chart format and calculate percentages
   const chartData = Object.entries(diversityData || {})
     .filter(([key, value]) => value && value > 0)
-    .map(([name, value]) => ({
-      name,
-      value: parseFloat(value),
-      percentage: (parseFloat(value) * 100).toFixed(1)
-    }))
+    .map(([name, value]) => {
+      const numeric = parseFloat(value);
+      const percentage = Number.isNaN(numeric) ? 0 : Math.round(numeric * 100);
+      return {
+        name,
+        value: numeric,
+        percentage
+      };
+    })
     .sort((a, b) => b.value - a.value); // Sort by value descending
 
   // Custom tooltip

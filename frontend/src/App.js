@@ -29,6 +29,14 @@ function App() {
       const response = await schoolAPI.searchSchools(address);
       
       if (response.success && response.data) {
+        const hasSchools = (response.data.total_schools || 0) > 0;
+        const fallbackMetrics = {
+          college_readiness_score: null,
+          academic_preparation: null,
+          college_enrollment: null,
+          academic_performance: null
+        };
+
         // Transform API response to match frontend expectations
         const transformedData = {
           address: address,
@@ -47,10 +55,10 @@ function App() {
             college_readiness_score: school.metrics?.college_readiness_score || school.metrics?.act_average || 0,
             college_preparation: school.metrics?.college_preparation || 0,
             college_enrollment: school.metrics?.college_enrollment || 0,
-            college_performance: school.metrics?.college_performance || school.metrics?.graduation_rate || 0,
             total_students: school.metrics?.total_students,
             grade_academics: school.grade_academics || 'N/A',
             graduation_rate: school.metrics?.graduation_rate ? school.metrics.graduation_rate / 100 : null,
+            graduation_rate_percent: school.metrics?.graduation_rate ?? null,
             sat_average: school.metrics?.sat_average,
             act_average: school.metrics?.act_average,
             math_proficiency: school.metrics?.math_proficiency ? school.metrics.math_proficiency / 100 : null,
@@ -59,7 +67,7 @@ function App() {
             is_charter: school.school_type === 'Charter',
             is_high: true // Assuming high school for now
           })),
-          metrics: response.data.metrics,
+          metrics: hasSchools ? response.data.metrics : fallbackMetrics,
           trends: mockTrendsData // Still using mock trends data
         };
         

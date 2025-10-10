@@ -2,6 +2,13 @@ import React from 'react';
 import { Card, CardContent } from './ui/card';
 
 const MetricsCards = ({ metrics, isSearched }) => {
+  const formatMetricValue = (value) => {
+    if (value === null || value === undefined) return '--';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return '--';
+    return Math.round(numeric);
+  };
+
   const metricsData = [
     {
       title: 'College Readiness Score',
@@ -36,7 +43,7 @@ const MetricsCards = ({ metrics, isSearched }) => {
                   {metric.title}
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-2">
-                  {metric.value || '--'}
+                  {formatMetricValue(metric.value)}
                 </div>
                 <div className="text-xs text-gray-500">
                   {metric.description}

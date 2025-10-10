@@ -32,15 +32,18 @@ class SchoolDataProcessor:
         """Clean and preprocess the data"""
         # Convert numeric columns
         numeric_columns = [
-            'latitude', 'longitude', 'act_average', 'sat_average', 
-            'graduation_rate', 'total_students', 'math_proficiency', 
+            'latitude', 'longitude', 'act_average', 'sat_average',
+            'graduation_rate', 'total_students', 'math_proficiency',
             'reading_proficiency', 'four_year_matriculation_rate',
-            'free_reduced_lunch'
+            'free_reduced_lunch', 'student_teacher_ratio'
         ]
         
         for col in numeric_columns:
             if col in self.df.columns:
                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+
+        # Replace non-finite numeric values with NaN for downstream safety
+        self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         # Clean text columns
         text_columns = [
@@ -98,7 +101,8 @@ class SchoolDataProcessor:
             if column in self.df.columns:
                 base_condition |= self.df[column].str.contains(query_lower, na=False)
 
-        candidate_df = self.df[base_condition].copy() if base_condition.any() else self.df.copy()
+        base_matches = base_condition.any()
+        candidate_df = self.df[base_condition].copy() if base_matches else self.df.iloc[0:0].copy()
 
         # Token condition: ensure every meaningful token appears in precise fields
         if match_tokens:
@@ -115,7 +119,10 @@ class SchoolDataProcessor:
 
             # If no results after strict filtering, fall back to base condition
             if filtered_df.empty:
-                filtered_df = candidate_df.copy()
+                if base_matches and not candidate_df.empty:
+                    filtered_df = candidate_df.copy()
+                else:
+                    return []
         else:
             filtered_df = candidate_df.copy()
 
@@ -223,20 +230,141 @@ class SchoolDataProcessor:
             'college_enrollment': max(0, round(college_enrollment, 0)),
             'academic_performance': max(0, round(academic_performance, 0))
         }
+
+    def get_school_record(
+        self,
+        school_id: str,
+        *,
+        name: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        zipcode: Optional[str] = None
+    ) -> Optional[Dict]:
+        """Return the best matching school record for a given ID and optional location hints."""
+        if self.df is None:
+            return None
+
+        matches = self.df[self.df['niche_school_uuid'] == school_id]
+        if matches.empty:
+            return None
+
+        if len(matches) == 1:
+            return matches.iloc[0].to_dict()
+
+        def normalize_text(value: Optional[str]) -> str:
+            if value is None or (isinstance(value, float) and pd.isna(value)):
+                return ''
+            return str(value).strip().lower()
+
+        def normalize_zip(value: Optional[str]) -> str:
+            cleaned = normalize_text(value)
+            if not cleaned:
+                return ''
+            try:
+                decimal_value = Decimal(cleaned)
+                return str(int(decimal_value))
+            except (InvalidOperation, ValueError):
+                digits = re.sub(r'[^0-9]', '', cleaned)
+                return digits[:9]
+
+        target_name = normalize_text(name)
+        target_city = normalize_text(city)
+        target_state = normalize_text(state)
+        target_zip = normalize_zip(zipcode)
+
+        best_idx = matches.index[0]
+        best_score = -1
+        best_quality = -1
+
+        for idx, row in matches.iterrows():
+            score = 0
+
+            row_name = normalize_text(row.get('school_name'))
+            if target_name:
+                if row_name == target_name:
+                    score += 6
+                elif target_name in row_name:
+                    score += 3
+
+            row_city = normalize_text(row.get('address_city'))
+            if target_city:
+                if row_city == target_city:
+                    score += 4
+                elif target_city in row_city:
+                    score += 2
+
+            row_state = normalize_text(row.get('address_state'))
+            if target_state:
+                if row_state == target_state:
+                    score += 3
+                elif target_state in row_state:
+                    score += 1
+
+            row_zip = normalize_zip(row.get('address_zipcode'))
+            if target_zip and row_zip == target_zip:
+                score += 2
+
+            completeness = row.count()
+
+            if score > best_score or (score == best_score and completeness > best_quality):
+                best_score = score
+                best_quality = completeness
+                best_idx = idx
+
+        return matches.loc[best_idx].to_dict()
     
     def format_school_data(self, school_row: Dict) -> Dict:
         """Format raw school data into API response format"""
         def safe_get(value):
-            """Safely get a value, converting NaN to None"""
+            """Safely get a value, ensuring non-finite numbers are filtered out."""
+            if value is None:
+                return None
+            if isinstance(value, str):
+                cleaned = value.strip()
+                if cleaned == '' or cleaned.lower() in {'nan', 'inf', '-inf'}:
+                    return None
+            if isinstance(value, (int, float, np.number)):
+                if not np.isfinite(value):
+                    return None
             if pd.isna(value):
                 return None
             return value
             
         def safe_get_numeric(value, multiplier=1):
-            """Safely get a numeric value, converting NaN to None"""
-            if pd.isna(value) or value == 0:
+            """Safely get a numeric value, converting NaN/Inf/0 to None."""
+            numeric = safe_get(value)
+            if numeric is None:
                 return None
-            return value * multiplier
+            try:
+                result = float(numeric) * multiplier
+            except (TypeError, ValueError):
+                return None
+            if not np.isfinite(result) or result == 0:
+                return None
+            return result
+
+        def safe_get_zipcode(value):
+            cleaned = safe_get(value)
+            if cleaned is None:
+                return None
+            if isinstance(cleaned, (int, np.integer)):
+                return f"{int(cleaned):05d}"
+            if isinstance(cleaned, (float, np.floating)):
+                if np.isnan(cleaned):
+                    return None
+                return f"{int(cleaned):05d}"
+            try:
+                decimal_value = Decimal(str(cleaned))
+                return f"{int(decimal_value):05d}"
+            except (InvalidOperation, ValueError, TypeError):
+                digits = re.sub(r'[^0-9]', '', str(cleaned))
+                if not digits:
+                    return None
+                if len(digits) >= 9:
+                    return f"{digits[:5]}-{digits[5:9]}"
+                if len(digits) >= 5:
+                    return digits[:5]
+                return digits
             
         return {
             'id': school_row.get('niche_school_uuid', ''),
@@ -245,7 +373,7 @@ class SchoolDataProcessor:
                 'street': school_row.get('address_address', ''),
                 'city': school_row.get('address_city', ''),
                 'state': school_row.get('address_state', ''),
-                'zipcode': str(school_row.get('address_zipcode', '')) if school_row.get('address_zipcode') and not pd.isna(school_row.get('address_zipcode')) else None
+                'zipcode': safe_get_zipcode(school_row.get('address_zipcode'))
             },
             'coordinates': {
                 'latitude': safe_get(school_row.get('latitude')),
@@ -274,24 +402,68 @@ class SchoolDataProcessor:
     def format_complete_school_profile(self, school_row: Dict) -> Dict:
         """Format complete school profile with all requested fields"""
         def safe_get(value):
+            if value is None:
+                return None
+            if isinstance(value, str):
+                cleaned = value.strip()
+                if cleaned == '' or cleaned.lower() in {'nan', 'inf', '-inf'}:
+                    return None
+            if isinstance(value, (int, float, np.number)):
+                if not np.isfinite(value):
+                    return None
             if pd.isna(value):
                 return None
             return value
             
         def safe_get_string(value):
-            if pd.isna(value) or value == '' or value == 'nan':
+            cleaned_value = safe_get(value)
+            if cleaned_value is None:
                 return None
-            return str(value)
+            if isinstance(cleaned_value, str):
+                stripped = cleaned_value.strip()
+                return stripped if stripped else None
+            return str(cleaned_value)
             
         def safe_get_numeric(value, multiplier=1):
-            if pd.isna(value) or value == 0:
+            numeric = safe_get(value)
+            if numeric is None:
                 return None
-            return value * multiplier
+            try:
+                result = float(numeric) * multiplier
+            except (TypeError, ValueError):
+                return None
+            if not np.isfinite(result) or result == 0:
+                return None
+            return result
             
         def safe_get_bool(value):
-            if pd.isna(value):
+            numeric = safe_get(value)
+            if numeric is None:
                 return None
-            return bool(value) if value in [0, 1, 0.0, 1.0] else None
+            return bool(numeric) if numeric in [0, 1, 0.0, 1.0] else None
+
+        def safe_get_zipcode(value):
+            cleaned = safe_get(value)
+            if cleaned is None:
+                return None
+            if isinstance(cleaned, (int, np.integer)):
+                return f"{int(cleaned):05d}"
+            if isinstance(cleaned, (float, np.floating)):
+                if np.isnan(cleaned):
+                    return None
+                return f"{int(cleaned):05d}"
+            try:
+                decimal_value = Decimal(str(cleaned))
+                return f"{int(decimal_value):05d}"
+            except (InvalidOperation, ValueError, TypeError):
+                digits = re.sub(r'[^0-9]', '', str(cleaned))
+                if not digits:
+                    return None
+                if len(digits) >= 9:
+                    return f"{digits[:5]}-{digits[5:9]}"
+                if len(digits) >= 5:
+                    return digits[:5]
+                return digits
 
         def normalize_identifier(value):
             """Normalize identifier-like fields to readable strings"""
@@ -363,7 +535,7 @@ class SchoolDataProcessor:
             'address_address': safe_get_string(school_row.get('address_address')),
             'address_city': safe_get_string(school_row.get('address_city')),
             'address_state': safe_get_string(school_row.get('address_state')),
-            'address_zipcode': safe_get_string(school_row.get('address_zipcode')),
+            'address_zipcode': safe_get_zipcode(school_row.get('address_zipcode')),
             'latitude': safe_get(school_row.get('latitude')),
             'longitude': safe_get(school_row.get('longitude')),
             

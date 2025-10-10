@@ -26,9 +26,12 @@ export const schoolAPI = {
   },
 
   // Get details for a specific school
-  getSchoolDetails: async (schoolId) => {
+  getSchoolDetails: async (schoolId, params = {}) => {
     try {
-      const response = await apiClient.get(`/schools/${schoolId}`);
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([_, value]) => value !== undefined && value !== null && value !== '')
+      );
+      const response = await apiClient.get(`/schools/${schoolId}`, { params: filteredParams });
       return response.data;
     } catch (error) {
       console.error('Error getting school details:', error);

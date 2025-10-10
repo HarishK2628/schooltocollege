@@ -14,6 +14,13 @@ L.Icon.Default.mergeOptions({
 });
 
 const MapSection = ({ schools, searchCenter, isSearched }) => {
+  const formatScore = (value) => {
+    if (value === null || value === undefined) return 'N/A';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return 'N/A';
+    return Math.round(numeric);
+  };
+
   if (!isSearched) {
     return (
       <div className="px-6 py-6">
@@ -70,7 +77,7 @@ const MapSection = ({ schools, searchCenter, isSearched }) => {
                         <p className="text-sm text-gray-600">{school.address_city}, {school.address_state}</p>
                         <div className="mt-2 text-sm">
                           <span className="font-medium">College Readiness: </span>
-                          <span className="text-blue-600">{school.college_readiness_score}</span>
+                          <span className="text-blue-600">{formatScore(school.college_readiness_score)}</span>
                         </div>
                       </div>
                     </Popup>
