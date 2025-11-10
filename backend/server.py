@@ -32,13 +32,22 @@ api_router.include_router(schools.router)
 # Include the router in the main app
 app.include_router(api_router)
 
+# --- THIS IS THE FIX ---
+# Define allowed origins for CORS
+# We must specify the exact frontend URL because allow_credentials=True
+origins = [
+    "http://localhost:3001",  # The address of your frontend
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=origins,  # Use the 'origins' list here
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- END OF FIX ---
+
 
 # Configure logging
 logging.basicConfig(
@@ -54,5 +63,5 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    #client.close()
     logger.info("School Finder API shutdown complete")

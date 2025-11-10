@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger(__name__)
 
+
 class SchoolDataProcessor:
     def __init__(self, csv_path: str):
         self.csv_path = csv_path
@@ -70,23 +71,33 @@ class SchoolDataProcessor:
         except Exception:
             pass
         return None
-        
+
     def load_data(self):
         """Load and preprocess the CSV data"""
         try:
             logger.info(f"Loading school data from {self.csv_path}")
             self.df = pd.read_csv(self.csv_path)
             logger.info(f"Loaded {len(self.df)} schools")
-            
+
             # Clean and preprocess data
             self._preprocess_data()
-            
+
         except Exception as e:
             logger.error(f"Error loading CSV data: {e}")
             raise
-    
+
     def _preprocess_data(self):
         """Clean and preprocess the data"""
+
+        # --- NEW FIX: Rename column to remove middle space ---
+        # This checks for the exact column name you found: 'college_ enrollment'
+        try:
+            if 'college_ enrollment' in self.df.columns:  # <-- NEW FIX
+                self.df.rename(columns={'college_ enrollment': 'college_enrollment'}, inplace=True)  # <-- NEW FIX
+                logger.info("Renamed 'college_ enrollment' to 'college_enrollment'")  # <-- NEW FIX
+        except Exception as e:  # <-- NEW FIX
+            logger.warning(f"Could not rename college enrollment column: {e}")  # <-- NEW FIX
+
         # Normalize alternate CSV schemas (e.g., synthetic_data_filled.csv)
         try:
             cols = set(self.df.columns)
@@ -110,38 +121,43 @@ class SchoolDataProcessor:
                 # Ensure optional numeric columns exist to avoid KeyErrors downstream
                 for col in ['act_average', 'graduation_rate', 'total_students',
                             'math_proficiency', 'reading_proficiency',
-                            'four_year_matriculation_rate', 'free_reduced_lunch',
+                            'college_enrollment', 'free_reduced_lunch',
                             'latitude', 'longitude']:
                     if col not in self.df.columns:
                         self.df[col] = pd.NA
         except Exception as e:
             logger.warning(f"Schema normalization skipped due to error: {e}")
 
-        # Convert numeric columns
+        # --- This list contains ALL numeric columns ---
+        # It will convert "70" or "70%" to the number 70.0
         numeric_columns = [
             'latitude', 'longitude', 'act_average', 'sat_average',
             'graduation_rate', 'total_students', 'math_proficiency',
-            'reading_proficiency', 'four_year_matriculation_rate',
+            'reading_proficiency', 'college_enrollment',
             'free_reduced_lunch', 'student_teacher_ratio'
         ]
-        
+
         for col in numeric_columns:
             if col in self.df.columns:
-                self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                # Remove any non-numeric characters (like '%') and convert to number
+                self.df[col] = pd.to_numeric(
+                    self.df[col].astype(str).str.replace(r'[^0-9.]', '', regex=True),
+                    errors='coerce'
+                )
 
         # Replace non-finite numeric values with NaN for downstream safety
         self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        
+
         # Clean text columns
         text_columns = [
-            'school_name', 'address_address', 'address_city', 
+            'school_name', 'address_address', 'address_city',
             'address_state', 'county_name', 'metro_area_name', 'state_name'
         ]
-        
+
         for col in text_columns:
             if col in self.df.columns:
                 self.df[col] = self.df[col].astype(str).fillna('')
-                
+
         # Create search index columns (lowercase for case-insensitive search)
         self.df['search_school_name'] = self.df['school_name'].str.lower()
         self.df['search_address'] = self.df['address_address'].str.lower()
@@ -172,12 +188,43 @@ class SchoolDataProcessor:
             )
         except Exception as e:
             logger.warning(f"Failed to build normalized address fields: {e}")
-    
+
+        # --- FIX 1: Create a new stable ID column (This is the new part) ---
+        try:
+            logger.info("Creating stable school IDs...")
+
+            def create_id(row):
+                # Use normalized names for the ID
+                name = str(row.get('school_name', '')).strip().upper()
+                name_slug = re.sub(r'[^A-Z0-9]+', '-', name)  # A-B-C-PCS
+
+                city = str(row.get('address_city', '')).strip().upper()
+                city_slug = re.sub(r'[^A-Z0-9]+', '-', city)  # WASHINGTON
+
+                state = str(row.get('address_state', '')).strip().upper()  # DC
+
+                # Filter out empty parts
+                id_parts = [part for part in [name_slug, city_slug, state] if part]
+
+                if not name_slug:  # Handle edge case of missing name
+                    # Fallback to a hash of the row if no name
+                    return hash(tuple(row.items()))
+
+                return "-".join(id_parts)
+
+            self.df['stable_school_id'] = self.df.apply(create_id, axis=1)
+            # Drop any schools that couldn't get an ID
+            self.df.dropna(subset=['stable_school_id'], inplace=True)
+            logger.info(f"Created {self.df['stable_school_id'].nunique()} unique stable IDs.")
+        except Exception as e:
+            logger.error(f"Error creating stable school IDs: {e}")
+            raise
+
     def search_schools(self, query: str) -> List[Dict]:
         """Search for schools based on query"""
         if self.df is None:
             return []
-            
+
         query_lower = (query or '').strip().lower()
         if not query_lower:
             return []
@@ -228,7 +275,7 @@ class SchoolDataProcessor:
                     if exact_addr.any() or exact_full.any():
                         addr_matches = self.df[exact_addr | exact_full].copy()
                         # Return only exact matches (no broader list)
-                        return addr_matches.to_dict('records')
+                        return [self.format_school_data(row) for _, row in addr_matches.iterrows()]
             except Exception:
                 # Fall back to general search if normalization fails
                 pass
@@ -339,10 +386,9 @@ class SchoolDataProcessor:
         # Sort by relevance score
         filtered_df = filtered_df.sort_values('relevance_score', ascending=False)
 
-        # --- MODIFICATION 2 ---
         # Convert to list of dictionaries using the formatter
         return [self.format_school_data(row) for _, row in filtered_df.iterrows()]
-    
+
     def calculate_aggregate_metrics(self, schools_data: List[Dict]) -> Dict[str, float]:
         """Calculate aggregate metrics from school list"""
         if not schools_data:
@@ -352,65 +398,74 @@ class SchoolDataProcessor:
                 'college_enrollment': 0,
                 'academic_performance': 0
             }
-        
-        # --- MODIFICATION 3 ---
+
         # This logic is updated to parse the formatted data from search_schools
-        
+
         # If data is formatted (i.e., from search_schools), extract metrics
-        if 'metrics' in schools_data[0]:
+        if schools_data and 'metrics' in schools_data[0]:
             df = pd.DataFrame([s['metrics'] for s in schools_data if 'metrics' in s])
             # Rename columns from the formatted names to the raw names
             # that the rest of this function expects.
             df.rename(columns={
-                'college_readiness_score': 'act_average', # This holds the raw ACT
-                'college_enrollment': 'four_year_matriculation_rate',
+                'college_readiness_score': 'act_average',  # This holds the raw ACT
+                'college_enrollment': 'college_enrollment',
                 'college_performance': 'graduation_rate',
-                'graduation_rate': 'graduation_rate' # Explicitly keep this
+                'graduation_rate': 'graduation_rate'  # Explicitly keep this
             }, inplace=True)
-            
-            # Divide percentages back to decimals (0-1) for calculation
-            if 'four_year_matriculation_rate' in df.columns:
-                df['four_year_matriculation_rate'] = df['four_year_matriculation_rate'].apply(lambda x: x / 100 if pd.notna(x) else x)
-            if 'graduation_rate' in df.columns:
-                df['graduation_rate'] = df['graduation_rate'].apply(lambda x: x / 100 if pd.notna(x) else x)
-            if 'math_proficiency' in df.columns:
-                 df['math_proficiency'] = df['math_proficiency'].apply(lambda x: x / 100 if pd.notna(x) else x)
-            if 'reading_proficiency' in df.columns:
-                 df['reading_proficiency'] = df['reading_proficiency'].apply(lambda x: x / 100 if pd.notna(x) else x)
-        else:
-             # Fallback if raw data (e.g., from a different source) is passed
-             df = pd.DataFrame(schools_data)
 
-        
+            # --- We divide by 100 HERE for aggregate calculation ---
+            # The formatter passes the raw number (e.g., 70), so we
+            # convert to a decimal (0.70) for calculating the mean.
+            if 'college_enrollment' in df.columns:
+                df['college_enrollment'] = df['college_enrollment'].apply(lambda x: x / 100.0 if pd.notna(x) else x)
+            if 'graduation_rate' in df.columns:
+                df['graduation_rate'] = df['graduation_rate'].apply(lambda x: x / 100.0 if pd.notna(x) else x)
+            if 'math_proficiency' in df.columns:
+                df['math_proficiency'] = df['math_proficiency'].apply(lambda x: x / 100.0 if pd.notna(x) else x)
+            if 'reading_proficiency' in df.columns:
+                df['reading_proficiency'] = df['reading_proficiency'].apply(lambda x: x / 100.0 if pd.notna(x) else x)
+        else:
+            # Fallback if raw data (e.g., from a different source) is passed
+            df = pd.DataFrame(schools_data)
+            # Manually convert raw columns if they exist
+            if 'college_enrollment' in df.columns:
+                df['college_enrollment'] = df['college_enrollment'].apply(lambda x: x / 100.0 if pd.notna(x) and x > 1 else x)
+            if 'graduation_rate' in df.columns:
+                df['graduation_rate'] = df['graduation_rate'].apply(lambda x: x / 100.0 if pd.notna(x) and x > 1 else x)
+            if 'math_proficiency' in df.columns:
+                df['math_proficiency'] = df['math_proficiency'].apply(lambda x: x / 100.0 if pd.notna(x) and x > 1 else x)
+            if 'reading_proficiency' in df.columns:
+                df['reading_proficiency'] = df['reading_proficiency'].apply(lambda x: x / 100.0 if pd.notna(x) and x > 1 else x)
+
         # College Readiness Score (normalized ACT/SAT averages)
         # 'act_average' column now correctly sourced from 'college_readiness_score'
-        act_avg = df['act_average'].dropna() 
-        sat_avg = df.get('sat_average', pd.Series(dtype=float)).dropna() # 'sat_average' is fine
-        
+        act_avg = df['act_average'].dropna()
+        sat_avg = df.get('sat_average', pd.Series(dtype=float)).dropna()  # 'sat_average' is fine
+
         college_readiness = 0
         if not act_avg.empty:
             college_readiness = max(0, act_avg.mean())
         elif not sat_avg.empty:
             # Convert SAT to ACT scale approximately
             college_readiness = max(0, (sat_avg.mean() - 400) / 52)  # Rough conversion
-            
+
         # Academic Preparation (math + reading proficiency)
-        # Values are now correctly converted back to decimals (0-1)
+        # Values are now in decimal format (0-1)
         math_prof = df.get('math_proficiency', pd.Series(dtype=float)).dropna()
         reading_prof = df.get('reading_proficiency', pd.Series(dtype=float)).dropna()
-        academic_prep = ((math_prof.mean() if not math_prof.empty else 0.5) + 
+        academic_prep = ((math_prof.mean() if not math_prof.empty else 0.5) +
                          (reading_prof.mean() if not reading_prof.empty else 0.5)) * 50
-        
+
         # College Enrollment (matriculation rate)
-        # Values are now correctly converted back to decimals (0-1)
-        matriculation = df['four_year_matriculation_rate'].dropna()
+        # Values are now in decimal format (0-1)
+        matriculation = df['college_enrollment'].dropna()
         college_enrollment = (matriculation.mean() if not matriculation.empty else 0.6) * 100
-        
+
         # Academic Performance (graduation rate)
-        # Values are now correctly converted back to decimals (0-1)
+        # Values are now in decimal format (0-1)
         grad_rate = df['graduation_rate'].dropna()
         academic_performance = (grad_rate.mean() if not grad_rate.empty else 0.75) * 100
-        
+
         return {
             'college_readiness_score': max(0, round(college_readiness, 0)),
             'academic_preparation': max(0, round(academic_prep, 0)),
@@ -431,12 +486,12 @@ class SchoolDataProcessor:
         if self.df is None:
             return None
 
-        matches = self.df[self.df['niche_school_uuid'] == school_id]
+        matches = self.df[self.df['stable_school_id'] == school_id]
         if matches.empty:
             return None
 
         if len(matches) == 1:
-            return matches.iloc[0].to_dict()
+            return self.format_complete_school_profile(matches.iloc[0].to_dict())
 
         def normalize_text(value: Optional[str]) -> str:
             if value is None or (isinstance(value, float) and pd.isna(value)):
@@ -498,10 +553,11 @@ class SchoolDataProcessor:
                 best_quality = completeness
                 best_idx = idx
 
-        return matches.loc[best_idx].to_dict()
-    
+        return self.format_complete_school_profile(matches.loc[best_idx].to_dict())
+
     def format_school_data(self, school_row: Dict) -> Dict:
         """Format raw school data into API response format"""
+
         def safe_get(value):
             """Safely get a value, ensuring non-finite numbers are filtered out."""
             if value is None:
@@ -516,9 +572,9 @@ class SchoolDataProcessor:
             if pd.isna(value):
                 return None
             return value
-            
+
         def safe_get_numeric(value, multiplier=1):
-            """Safely get a numeric value, converting NaN/Inf/0 to None."""
+            """Safely get a numeric value, converting NaN/Inf to None. Allows 0."""
             numeric = safe_get(value)
             if numeric is None:
                 return None
@@ -526,8 +582,11 @@ class SchoolDataProcessor:
                 result = float(numeric) * multiplier
             except (TypeError, ValueError):
                 return None
-            if not np.isfinite(result) or result == 0:
+
+            # --- Allows 0 as a valid value ---
+            if not np.isfinite(result):
                 return None
+
             return result
 
         def safe_get_zipcode(value):
@@ -567,7 +626,7 @@ class SchoolDataProcessor:
         ])).replace(' ', '_')
 
         return {
-            'id': safe_get_string(school_row.get('niche_school_uuid')) or fallback_id,
+            'id': safe_get_string(school_row.get('stable_school_id')),
             'school_name': school_row.get('school_name', ''),
             'address': {
                 'street': school_row.get('address_address', ''),
@@ -582,25 +641,27 @@ class SchoolDataProcessor:
             'metrics': {
                 'college_readiness_score': self._compute_college_readiness_score(school_row),
                 'college_preparation': self._calculate_college_prep_score(school_row),
-                'college_enrollment': safe_get_numeric(school_row.get('four_year_matriculation_rate'), 100),
-                'college_performance': safe_get_numeric(school_row.get('graduation_rate'), 100),
-                'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 100),
+                # --- Multiplier is 1 (pass the raw number 70) ---
+                'college_enrollment': safe_get_numeric(school_row.get('college_enrollment'), 1),
+                'college_performance': safe_get_numeric(school_row.get('graduation_rate'), 1),
+                'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 1),
                 'total_students': int(school_row.get('total_students', 0)) if pd.notna(school_row.get('total_students')) and school_row.get('total_students') != 0 else None,
                 'sat_average': safe_get(school_row.get('sat_average')),
                 'act_average': safe_get(school_row.get('act_average')),
-                'math_proficiency': safe_get_numeric(school_row.get('math_proficiency'), 100),
-                'reading_proficiency': safe_get_numeric(school_row.get('reading_proficiency'), 100)
+                'math_proficiency': safe_get_numeric(school_row.get('math_proficiency'), 1),
+                'reading_proficiency': safe_get_numeric(school_row.get('reading_proficiency'), 1)
             },
             'demographics': {
                 'free_reduced_lunch': safe_get(school_row.get('free_reduced_lunch')),
                 'diversity_breakdown': self._extract_diversity_data(school_row)
             },
             'school_type': self._determine_school_type(school_row),
-            'grades_offered': school_row.get('grades_offered', '')
+            'grades_offered': safe_get_string(school_row.get('grades_offered'))
         }
-    
+
     def format_complete_school_profile(self, school_row: Dict) -> Dict:
         """Format complete school profile with all requested fields"""
+
         def safe_get(value):
             if value is None:
                 return None
@@ -614,7 +675,7 @@ class SchoolDataProcessor:
             if pd.isna(value):
                 return None
             return value
-            
+
         def safe_get_string(value):
             cleaned_value = safe_get(value)
             if cleaned_value is None:
@@ -623,8 +684,9 @@ class SchoolDataProcessor:
                 stripped = cleaned_value.strip()
                 return stripped if stripped else None
             return str(cleaned_value)
-            
+
         def safe_get_numeric(value, multiplier=1):
+            """Safely get a numeric value, converting NaN/Inf to None. Allows 0."""
             numeric = safe_get(value)
             if numeric is None:
                 return None
@@ -632,10 +694,13 @@ class SchoolDataProcessor:
                 result = float(numeric) * multiplier
             except (TypeError, ValueError):
                 return None
-            if not np.isfinite(result) or result == 0:
+
+            # --- Allows 0 as a valid value ---
+            if not np.isfinite(result):
                 return None
+
             return result
-            
+
         def safe_get_bool(value):
             numeric = safe_get(value)
             if numeric is None:
@@ -678,7 +743,7 @@ class SchoolDataProcessor:
                 return normalized
             except (InvalidOperation, ValueError):
                 return cleaned.strip()
-        
+
         # Extract top colleges
         top_colleges = []
         seen_colleges = set()
@@ -698,7 +763,7 @@ class SchoolDataProcessor:
                 'ipeds': college_ipeds,
                 'name': college_name
             })
-        
+
         # Extract top majors
         top_majors = []
         seen_majors = set()
@@ -718,16 +783,18 @@ class SchoolDataProcessor:
                 'name': major_name
             })
             seen_majors.add(dedupe_key)
-        
+
         return {
             # Basic Information
-            'niche_school_uuid': safe_get_string(school_row.get('niche_school_uuid')),
+            'id': safe_get_string(school_row.get('stable_school_id')),
             'school_name': safe_get_string(school_row.get('school_name')),
             'nces_id': safe_get_string(school_row.get('nces_id')),
             'niche_sd_uuid': safe_get_string(school_row.get('niche_sd_uuid')),
             'lea_id': safe_get(school_row.get('lea_id')),
             'sd_name': safe_get_string(school_row.get('sd_name')),
-            
+            'level': safe_get_string(school_row.get('level')),
+            'school_type': self._determine_school_type(school_row),
+
             # Location
             'county_name': safe_get_string(school_row.get('county_name')),
             'metro_area_name': safe_get_string(school_row.get('metro_area_name')),
@@ -738,24 +805,27 @@ class SchoolDataProcessor:
             'address_zipcode': safe_get_zipcode(school_row.get('address_zipcode')),
             'latitude': safe_get(school_row.get('latitude')),
             'longitude': safe_get(school_row.get('longitude')),
-            
+
             # Contact Information
             'phone_number': safe_get_string(school_row.get('phone_number')),
             'website': safe_get_string(school_row.get('website')),
-            
+
             # Academic Performance
-            'four_year_matriculation_rate': safe_get_numeric(school_row.get('four_year_matriculation_rate'), 100),
-            'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 100),
+            # --- Multiplier is 1 (pass the raw number 70) ---
+            'college_enrollment': safe_get_numeric(school_row.get('college_enrollment'), 1),
+            'graduation_rate': safe_get_numeric(school_row.get('graduation_rate'), 1),
             'grade_overall': safe_get_string(school_row.get('grade_overall')),
             'student_teacher_ratio': safe_get(school_row.get('student_teacher_ratio')),
-            
+
             # Demographics
             'gender_breakdown_female': safe_get(school_row.get('gender_breakdown_female')),
             'gender_breakdown_male': safe_get(school_row.get('gender_breakdown_male')),
             'total_students': safe_get(school_row.get('total_students')),
-            
+
             # School Characteristics
             'grades_offered': safe_get_string(school_row.get('grades_offered')),
+            'level': safe_get_string(school_row.get('level')),
+            'school_type': self._determine_school_type(school_row),
             'is_boarding': safe_get_bool(school_row.get('is_boarding')),
             'is_charter': safe_get_bool(school_row.get('is_charter')),
             'is_pk': safe_get_bool(school_row.get('is_pk')),
@@ -764,45 +834,46 @@ class SchoolDataProcessor:
             'is_high': safe_get_bool(school_row.get('is_high')),
             'is_public': safe_get_bool(school_row.get('is_public')),
             'religion_general': safe_get_string(school_row.get('religion_general')),
-            
+
             # Financial Information
             'tuition': safe_get(school_row.get('tuition')),
             'pk_tuit': safe_get(school_row.get('pk_tuit')),
-            
+
             # Diversity Information
             'diversity_breakdown': self._extract_diversity_data(school_row),
-            
+
             # College and Career Readiness
             'top_colleges': top_colleges,
             'top_majors': top_majors
         }
-    
+
     def _calculate_college_prep_score(self, school_row: Dict) -> Optional[float]:
         """Calculate college preparation score from available metrics"""
         scores = []
-        
+
+        # --- Use raw score (e.g., 70) ---
         math_prof = school_row.get('math_proficiency')
         if math_prof and not pd.isna(math_prof):
-            scores.append(math_prof * 100)
-            
+            scores.append(math_prof)
+
         reading_prof = school_row.get('reading_proficiency')
         if reading_prof and not pd.isna(reading_prof):
-            scores.append(reading_prof * 100)
-            
+            scores.append(reading_prof)
+
         grade_academics = school_row.get('grade_academics')
         if grade_academics and not pd.isna(grade_academics):
             # Convert letter grade to numeric
             grade_map = {'A+': 100, 'A': 95, 'A-': 90, 'B+': 85, 'B': 80, 'B-': 75, 'C+': 70, 'C': 65}
             scores.append(grade_map.get(grade_academics, 70))
-            
+
         return sum(scores) / len(scores) if scores else None
-    
+
     def _extract_diversity_data(self, school_row: Dict) -> Dict[str, float]:
         """Extract diversity breakdown from school data"""
         diversity = {}
         diversity_fields = {
             'diversity_breakdown_african_american': 'African American',
-            'diversity_breakdown_asian': 'Asian', 
+            'diversity_breakdown_asian': 'Asian',
             'diversity_breakdown_hispanic': 'Hispanic/Latino',
             'diversity_breakdown_white': 'White',
             'diversity_breakdown_multiracial': 'Multiracial',
@@ -811,14 +882,14 @@ class SchoolDataProcessor:
             'diversity_breakdown_international': 'International',
             'diversity_breakdown_unknown': 'Unknown'
         }
-        
+
         for field, label in diversity_fields.items():
             value = school_row.get(field)
             if value and not pd.isna(value):
                 diversity[label] = float(value)
-                
+
         return diversity
-    
+
     def _determine_school_type(self, school_row: Dict) -> str:
         """Determine school type from boolean flags"""
         if school_row.get('is_public', 0):

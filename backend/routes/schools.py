@@ -16,7 +16,7 @@ data_processor = None
 def get_data_processor() -> SchoolDataProcessor:
     global data_processor
     if data_processor is None:
-        csv_name = os.getenv("SCHOOL_CSV_PATH", "school_data.csv")
+        csv_name = os.getenv("SCHOOL_CSV_PATH", "synthetic_data_filled_updated.csv")
         # Resolve CSV relative to backend directory
         backend_root = Path(__file__).resolve().parents[1]
         csv_path = backend_root / csv_name
