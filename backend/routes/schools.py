@@ -10,18 +10,24 @@ import re
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/schools", tags=["schools"])
 
-# Global data processor instance
-data_processor = None
-
+# --- THIS IS THE FIX ---
+# We no longer cache the data processor.
+# This function creates a NEW instance on every request,
+# ensuring all data and logic is 100% up-to-date.
 def get_data_processor() -> SchoolDataProcessor:
-    global data_processor
-    if data_processor is None:
-        csv_name = os.getenv("SCHOOL_CSV_PATH", "synthetic_data_filled_updated.csv")
-        # Resolve CSV relative to backend directory
-        backend_root = Path(__file__).resolve().parents[1]
-        csv_path = backend_root / csv_name
-        data_processor = SchoolDataProcessor(str(csv_path))
-    return data_processor
+    """Initializes and returns a new data processor instance."""
+    csv_name = os.getenv("SCHOOL_CSV_PATH", "synthetic_data_filled_updated.csv")
+    # Resolve CSV relative to backend directory
+    backend_root = Path(__file__).resolve().parents[1]
+    csv_path = backend_root / csv_name
+    
+    if not csv_path.exists():
+        logger.error(f"FATAL: CSV file not found at {csv_path}")
+        raise HTTPException(status_code=500, detail=f"Data file not found: {csv_name}")
+        
+    # This creates a new instance *every time* it's called
+    # This guarantees our data_processor.py changes are used
+    return SchoolDataProcessor(str(csv_path))
 
 @router.post("/search", response_model=SearchResponse)
 async def search_schools(
@@ -118,6 +124,7 @@ async def search_schools(
         
         # Format school data
         formatted_schools = []
+        # Use [:50] limit for broad searches, but show all for specific zip search
         iterable = school_results if used_zip_filter else school_results[:50]
         for school_data in iterable:
             formatted_school = processor.format_school_data(school_data)
@@ -169,11 +176,12 @@ async def get_school_details(
         if school_data is None:
             raise HTTPException(status_code=404, detail="School not found")
 
-        complete_profile = processor.format_complete_school_profile(school_data)
+        # --- THIS WAS A BUG. The data is ALREADY formatted by get_school_record ---
+        # We just return the data we got from get_school_record
         
         return {
             "success": True,
-            "data": complete_profile
+            "data": school_data # <-- Return the already-formatted data
         }
         
     except HTTPException:
@@ -191,6 +199,23 @@ async def get_schools_stats(
         if processor.df is None:
             raise HTTPException(status_code=500, detail="School data not loaded")
         
+        # Ensure required columns exist before trying to access them
+        required_cols = ['state_name', 'address_city', 'county_name', 'metro_area_name']
+        for col in required_cols:
+            if col not in processor.df.columns:
+                logger.warning(f"Stats: Column '{col}' not found. Returning 0 for stats.")
+                # Return empty stats if columns are missing
+                return {
+                    "success": True,
+                    "data": {
+                        "total_schools": len(processor.df),
+                        "states": 0,
+                        "cities": 0,
+                        "counties": 0,
+                        "metro_areas": 0
+                    }
+                }
+
         stats = {
             "total_schools": len(processor.df),
             "states": processor.df['state_name'].nunique(),

@@ -35,18 +35,23 @@ app.include_router(api_router)
 # --- THIS IS THE FIX ---
 # Define allowed origins for CORS
 # We must specify the exact frontend URL because allow_credentials=True
+from fastapi.middleware.cors import CORSMiddleware
+
 origins = [
-    "http://localhost:3001",  # The address of your frontend
+    "http://localhost:3001",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=origins,          # or ["*"] temporarily in dev
     allow_credentials=True,
-    allow_origins=origins,  # Use the 'origins' list here
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-# --- END OF FIX ---
 
 
 # Configure logging
